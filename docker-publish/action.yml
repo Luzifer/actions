@@ -1,0 +1,65 @@
+name: Docker Publish
+description: Build and publish a Docker image to a registry
+
+inputs:
+  build-secrets:
+    description: Secrets to pass into Docker-Build
+    required: false
+  context:
+    description: Docker build context
+    default: .
+    required: false
+  checkout:
+    description: Whether to do the checkout inside this action
+    default: 'true'
+    required: false
+  image:
+    description: Image name including registry (falls back to <registry>/<owner>/<repo>)
+    required: false
+  password:
+    description: Registry password or token (falls back to `github.token`)
+    required: false
+  push:
+    description: Whether to push the built image (falls back to pushing when not on a pull-request)
+    required: false
+  registry:
+    description: Docker registry hostname
+    default: ghcr.io
+    required: false
+  username:
+    description: Registry username (falls back to the Github actor)
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      if: ${{ inputs.checkout == 'true' }}
+      with:
+        show-progress: false
+
+    - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+      if: ${{ inputs.push == 'true' || (inputs.push == '' && github.event_name != 'pull_request') }}
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.username || github.actor }}
+        password: ${{ inputs.password || github.token }}
+
+    - id: image
+      if: ${{ inputs.image == '' }}
+      shell: bash
+      run: |
+        echo "name=${{ inputs.registry }}/${GITHUB_REPOSITORY,,}" >>"${GITHUB_OUTPUT}"
+
+    - id: meta
+      uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+      with:
+        images: ${{ inputs.image || steps.image.outputs.name }}
+
+    - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      with:
+        context: ${{ inputs.context }}
+        push: ${{ inputs.push == 'true' || (inputs.push == '' && github.event_name != 'pull_request') }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        secrets: ${{ inputs['build-secrets'] }}
