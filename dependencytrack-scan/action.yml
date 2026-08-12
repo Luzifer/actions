@@ -1,0 +1,85 @@
+name: Dependency-Track Scan
+description: Generate and upload an SBOM to a Dependency-Track project
+
+inputs:
+  checkout:
+    description: Whether to do the checkout inside this action
+    default: 'true'
+    required: false
+  latest:
+    description: Whether a newly created project version is the latest version (defaults to true for tags)
+    required: false
+  project:
+    description: Dependency-Track project name (defaults to the GitHub repository)
+    required: false
+  token:
+    description: Dependency-Track API token
+    required: true
+  url:
+    description: Dependency-Track instance URL
+    required: true
+  version:
+    description: Dependency-Track project version (defaults to the branch or tag name)
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      if: ${{ inputs.checkout == 'true' }}
+      with:
+        show-progress: false
+
+    - id: sbom
+      env:
+        RUNNER_TEMP_DIR: ${{ runner.temp }}
+        SBOM_PROJECT: ${{ inputs.project || github.repository }}
+        SBOM_VERSION: ${{ inputs.version || github.head_ref || github.ref_name }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        sbom_path="$(mktemp "${RUNNER_TEMP_DIR}/dependencytrack-sbom.XXXXXX.json")"
+        trap 'rm -f "${sbom_path}"' ERR
+
+        syft scan dir:. \
+          --output "cyclonedx-json@1.6=${sbom_path}" \
+          --source-name "${SBOM_PROJECT}" \
+          --source-version "${SBOM_VERSION}"
+
+        echo "path=${sbom_path}" >>"${GITHUB_OUTPUT}"
+
+    - env:
+        DEPENDENCYTRACK_LATEST: ${{ inputs.latest || (github.ref_type == 'tag' && 'true' || 'false') }}
+        DEPENDENCYTRACK_PROJECT: ${{ inputs.project || github.repository }}
+        DEPENDENCYTRACK_SBOM_PATH: ${{ steps.sbom.outputs.path }}
+        DEPENDENCYTRACK_TOKEN: ${{ inputs.token }}
+        DEPENDENCYTRACK_URL: ${{ inputs.url }}
+        DEPENDENCYTRACK_VERSION: ${{ inputs.version || github.head_ref || github.ref_name }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        trap 'rm -f "${DEPENDENCYTRACK_SBOM_PATH}"' EXIT
+
+        if [[ ! -r "${DEPENDENCYTRACK_SBOM_PATH}" ]]; then
+          echo "SBOM is not readable: ${DEPENDENCYTRACK_SBOM_PATH}" >&2
+          exit 1
+        fi
+
+        if [[ "${DEPENDENCYTRACK_LATEST}" != 'true' && "${DEPENDENCYTRACK_LATEST}" != 'false' ]]; then
+          echo "latest must be either 'true' or 'false'" >&2
+          exit 1
+        fi
+
+        curl \
+          --fail-with-body \
+          --form 'autoCreate=true' \
+          --form "bom=@${DEPENDENCYTRACK_SBOM_PATH}" \
+          --form-string "isLatest=${DEPENDENCYTRACK_LATEST}" \
+          --form-string "projectName=${DEPENDENCYTRACK_PROJECT}" \
+          --form-string "projectVersion=${DEPENDENCYTRACK_VERSION}" \
+          --header "X-Api-Key: ${DEPENDENCYTRACK_TOKEN}" \
+          --show-error \
+          --silent \
+          "${DEPENDENCYTRACK_URL%/}/api/v1/bom"
