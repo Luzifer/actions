@@ -42,7 +42,7 @@ runs:
         sbom_path="$(mktemp "${RUNNER_TEMP_DIR}/dependencytrack-sbom.XXXXXX.json")"
         trap 'rm -f "${sbom_path}"' ERR
 
-        syft scan dir:. \
+        syft -q scan dir:. \
           --output "cyclonedx-json@1.6=${sbom_path}" \
           --source-name "${SBOM_PROJECT}" \
           --source-version "${SBOM_VERSION}"
