@@ -1,8 +1,8 @@
 # Dependency-Track Scan
 
-Generate a CycloneDX 1.6 SBOM with Syft and upload it to Dependency-Track.
+Generate a CycloneDX SBOM with Trivy and upload it to Dependency-Track.
 
-The action expects `syft` and `curl` to be available on the runner. It creates the Dependency-Track project version when it does not exist and uploads to the existing project version otherwise.
+The action expects `trivy` and `curl` to be available on the runner. It creates the Dependency-Track project version when it does not exist and uploads to the existing project version otherwise.
 
 ## Usage
 
