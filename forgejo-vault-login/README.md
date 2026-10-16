@@ -2,7 +2,7 @@
 
 Authenticate the Vault CLI using an OpenID Connect token issued by Forgejo Actions.
 
-The action expects `curl`, `jq`, and `vault` to be available on the runner. It stores the resulting Vault token in the Vault CLI token helper and makes the configured `VAULT_ADDR` available to subsequent workflow steps.
+The action expects `curl`, `jq`, and `vault` to be available on the runner. It exchanges the Forgejo JWT at the configured Vault JWT backend, stores the resulting Vault token in the Vault CLI token helper, and exports `VAULT_ADDR` and `VAULT_TOKEN` for subsequent workflow steps.
 
 ## Usage
 

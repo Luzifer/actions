@@ -56,11 +56,19 @@ runs:
 
         role_name="${VAULT_AUTH_ROLE:-forgejo-${GITHUB_REPOSITORY##*/}}"
 
-        vault login \
-          -method=jwt \
-          -no-print \
-          -path="${VAULT_AUTH_BACKEND}" \
+        vault_token="$(vault write \
+          -field=token \
+          "auth/${VAULT_AUTH_BACKEND}/login" \
           role="${role_name}" \
-          jwt="${jwt}"
+          jwt="${jwt}")"
+
+        if [[ -z "${vault_token}" ]]; then
+          echo 'Vault returned an empty token' >&2
+          exit 1
+        fi
+
+        echo "::add-mask::${vault_token}"
+        printf '%s\n' "${vault_token}" | vault login -no-print
 
         printf 'VAULT_ADDR=%s\n' "${VAULT_ADDR}" >>"${GITHUB_ENV}"
+        printf 'VAULT_TOKEN=%s\n' "${vault_token}" >>"${GITHUB_ENV}"
