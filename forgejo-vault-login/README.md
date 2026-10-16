@@ -2,7 +2,7 @@
 
 Authenticate the Vault CLI using an OpenID Connect token issued by Forgejo Actions.
 
-The action expects `curl`, `jq`, and `vault` to be available on the runner. It exchanges the Forgejo JWT at the configured Vault JWT backend, stores the resulting Vault token in the Vault CLI token helper, and exports `VAULT_ADDR` and `VAULT_TOKEN` for subsequent workflow steps.
+The action expects `curl`, `jq`, and `vault` to be available on the runner. It exchanges the Forgejo JWT at the configured Vault JWT backend and exports `VAULT_ADDR` and `VAULT_TOKEN` for subsequent steps in the same job.
 
 ## Usage
 
@@ -28,9 +28,9 @@ By default, the action logs into the `forgejo-jwt` authentication backend with t
 | Input | Default | Description |
 | --- | --- | --- |
 | `audience` | Forgejo default | Audience for the OIDC token. |
-| `backend` | `forgejo-jwt` | Vault JWT authentication backend path. |
+| `backend` | `forgejo-jwt` | Vault JWT authentication backend mount name below `auth/`. |
 | `role-name` | `forgejo-<repository name>` | Vault role name. |
-| `vault-addr` | `env.VAULT_ADDR` | Vault server address. The effective value is exported as `VAULT_ADDR` for subsequent steps. |
+| `vault-addr` | `${{ env.VAULT_ADDR }}` | Vault server address. The effective value is exported as `VAULT_ADDR` for subsequent steps. |
 
 ## Examples
 
