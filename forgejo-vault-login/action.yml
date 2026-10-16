@@ -68,7 +68,7 @@ runs:
         fi
 
         echo "::add-mask::${vault_token}"
-        printf '%s\n' "${vault_token}" | vault login -no-print
+        printf '%s\n' "${vault_token}" | vault login -no-print -
 
         printf 'VAULT_ADDR=%s\n' "${VAULT_ADDR}" >>"${GITHUB_ENV}"
         printf 'VAULT_TOKEN=%s\n' "${vault_token}" >>"${GITHUB_ENV}"
