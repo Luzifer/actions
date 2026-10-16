@@ -1,0 +1,66 @@
+name: Forgejo Vault Login
+description: Authenticate to Vault using a Forgejo Actions OIDC token
+
+inputs:
+  audience:
+    description: Audience for the Forgejo OIDC token (uses the Forgejo default when empty)
+    required: false
+  backend:
+    description: Vault JWT authentication backend path
+    default: forgejo-jwt
+    required: false
+  role-name:
+    description: Vault role name (defaults to forgejo-<repository name>)
+    required: false
+  vault-addr:
+    description: Vault server address (defaults to VAULT_ADDR)
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - env:
+        OIDC_AUDIENCE: ${{ inputs.audience }}
+        VAULT_ADDR: ${{ inputs.vault-addr || env.VAULT_ADDR }}
+        VAULT_AUTH_BACKEND: ${{ inputs.backend }}
+        VAULT_AUTH_ROLE: ${{ inputs.role-name }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?Forgejo OIDC request token is not available: enable OpenID Connect for this workflow or job}"
+        : "${ACTIONS_ID_TOKEN_REQUEST_URL:?Forgejo OIDC request URL is not available: enable OpenID Connect for this workflow or job}"
+        : "${GITHUB_REPOSITORY:?Repository name is not available}"
+        : "${GITHUB_ENV:?GITHUB_ENV is not available}"
+        : "${VAULT_ADDR:?vault-addr or VAULT_ADDR must be set}"
+
+        curl_args=(
+          --fail-with-body
+          --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
+          --show-error
+          --silent
+        )
+
+        if [[ -n "${OIDC_AUDIENCE}" ]]; then
+          curl_args+=(--get --data-urlencode "audience=${OIDC_AUDIENCE}")
+        fi
+
+        oidc_response="$(curl "${curl_args[@]}" "${ACTIONS_ID_TOKEN_REQUEST_URL}")"
+
+        if ! jwt="$(jq --exit-status --raw-output '.value | select(type == "string" and length > 0)' <<<"${oidc_response}")"; then
+          echo 'Forgejo returned an invalid OIDC token response' >&2
+          exit 1
+        fi
+
+        echo "::add-mask::${jwt}"
+
+        role_name="${VAULT_AUTH_ROLE:-forgejo-${GITHUB_REPOSITORY##*/}}"
+
+        vault login \
+          -method=jwt \
+          -no-print \
+          -path="${VAULT_AUTH_BACKEND}" \
+          role="${role_name}" \
+          jwt="${jwt}"
+
+        printf 'VAULT_ADDR=%s\n' "${VAULT_ADDR}" >>"${GITHUB_ENV}"
