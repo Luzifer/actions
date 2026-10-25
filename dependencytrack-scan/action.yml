@@ -46,7 +46,8 @@ runs:
           --exit-code 0 \
           --format cyclonedx \
           --include-dev-deps \
-          --output "${sbom_path}"
+          --output "${sbom_path}" \
+          --scanners license
 
         echo "path=${sbom_path}" >>"${GITHUB_OUTPUT}"
 
